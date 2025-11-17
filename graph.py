@@ -8,6 +8,7 @@ from stack import Stack
 class Graph(List):
 
     class __nodeVertex:
+        """Clase interna que representa un vértice en el grafo."""
 
         def __init__(self, value: Any, other_values: Optional[Any] = None):
             self.value = value
@@ -21,6 +22,7 @@ class Graph(List):
             return self.value
     
     class __nodeEdge:
+        """Clase interna que representa una arista en el grafo."""
 
         def __init__(self, value: Any, weight: Any, other_values: Optional[Any] = None):
             self.value = value
@@ -31,6 +33,7 @@ class Graph(List):
             return f'Destination: {self.value} with weight --> {self.weight}'
     
     def __init__(self, is_directed=False):
+        """Inicializa un grafo, que puede ser dirigido o no dirigido."""
         self.add_criterion('value', self._order_by_value)
         self.is_directed = is_directed
 
@@ -43,6 +46,7 @@ class Graph(List):
     def show(
         self
     ) -> None:
+        """Muestra la estructura del grafo, vértice por vértice con sus aristas."""
         for vertex in self:
             print(f"Vertex: {vertex}")
             vertex.edges.show() 
@@ -50,17 +54,29 @@ class Graph(List):
     def insert_vertex(
         self,
         value: Any,
+        other_values: Optional[Any] = None
     ) -> None:
-        node_vertex = Graph.__nodeVertex(value)
+        """
+        Inserta un nuevo vértice en el grafo.
+
+        Args:
+            value: El valor principal del vértice.
+            other_values (optional): Un diccionario o objeto con datos adicionales.
+        """
+        node_vertex = Graph.__nodeVertex(value, other_values)
         self.append(node_vertex)
 
     def insert_edge(self, origin_vertex: Any, destination_vertex: Any, weight: int) -> None:
+        """
+        Inserta una arista entre dos vértices.
+        Si el grafo es no dirigido, la arista se crea en ambas direcciones.
+        """
         origin = self.search(origin_vertex, 'value')
         destination = self.search(destination_vertex, 'value')
         if origin is not None and destination is not None:
             node_edge = Graph.__nodeEdge(destination_vertex, weight)
             self[origin].edges.append(node_edge)
-            if self.is_directed and origin != destination:
+            if not self.is_directed and origin != destination:
                 node_edge = Graph.__nodeEdge(origin_vertex, weight)
                 self[destination].edges.append(node_edge)
         else:
@@ -72,6 +88,10 @@ class Graph(List):
         destination,
         key_value: str = None,
     ) -> Optional[Any]:
+        """
+        Elimina una arista entre un origen y un destino.
+        Si el grafo es no dirigido, intenta eliminar la arista en la dirección opuesta también.
+        """
         pos_origin = self.search(origin, key_value)
         if pos_origin is not None:
             edge = self[pos_origin].edges.delete_value(destination, key_value)
@@ -87,6 +107,9 @@ class Graph(List):
         key_value_vertex: str = None,
         key_value_edges: str = 'value',
     ) -> Optional[Any]:
+        """
+        Elimina un vértice del grafo y todas las aristas que apuntan hacia él.
+        """
         delete_value = g.delete_value(value, key_value_vertex)
         if delete_value is not None:
             for vertex in self:
@@ -94,10 +117,17 @@ class Graph(List):
         return delete_value
 
     def mark_as_unvisited(self) -> None:
+        """Marca todos los vértices del grafo como no visitados."""
         for vertex in self:
             vertex.visited = False
 
     def exist_path(self, origin, destination):
+        """
+        Verifica si existe un camino entre un vértice de origen y uno de destino.
+
+        Returns:
+            bool: True si existe un camino, False en caso contrario.
+        """
         def __exist_path(graph, origin, destination):
             result = False
             vertex_pos = graph.search(origin, 'value')
@@ -120,6 +150,7 @@ class Graph(List):
         return result
     
     def deep_sweep(self, value) -> None:
+        """Realiza un barrido en profundidad (DFS) del grafo desde un vértice de inicio."""
         def __deep_sweep(graph, value):
             vertex_pos = graph.search(value, 'value')
             if vertex_pos is not None:
@@ -135,6 +166,7 @@ class Graph(List):
         __deep_sweep(self, value)
         
     def amplitude_sweep(self, value)-> None:
+        """Realiza un barrido en amplitud (BFS) del grafo desde un vértice de inicio."""
         queue_vertex = Queue()
         self.mark_as_unvisited()
         vertex_pos = self.search(value, 'value')
@@ -153,18 +185,33 @@ class Graph(List):
                                 queue_vertex.arrive(self[destination_edge_pos])
 
     def dijkstra(self, origin):
+        """
+        Calcula el camino más corto desde un vértice de origen a todos los demás vértices
+        utilizando el algoritmo de Dijkstra.
+
+        Args:
+            origin: El valor del vértice de inicio.
+
+        Returns:
+            Stack: Una pila con la información del camino (destino, costo, predecesor).
+        """
         from math import inf
         no_visited = HeapMin()
         path = Stack()
+
+        # Inicializar todos los vértices con distancia infinita, excepto el origen (distancia 0)
         for vertex in self:
             distance = 0 if vertex.value == origin else inf
             no_visited.arrive([vertex.value, vertex, None], distance)
+        
         while no_visited.size() > 0:
+            # Seleccionar el nodo no visitado con la menor distancia
             value = no_visited.attention()
             costo_nodo_actual = value[0]
             path.push([value[1][0], costo_nodo_actual, value[1][2]])
             edges = value[1][1].edges
             for edge in edges:
+                # Relajación de aristas: si se encuentra un camino más corto, se actualiza
                 pos = no_visited.search(edge.value)
                 if pos is not None:
                     if pos is not None:
@@ -173,45 +220,46 @@ class Graph(List):
                             no_visited.change_priority(pos, costo_nodo_actual + edge.weight)
         return path
 
-    def kruskal(self, origin_vertex):
+    def kruskal(self):
+        """
+        Encuentra el Árbol de Expansión Mínimo (MST) de un grafo no dirigido y ponderado
+        utilizando el algoritmo de Kruskal.
+
+        Returns:
+            list: Una lista de tuplas, donde cada tupla representa una arista (origen, destino, peso) del MST.
+        """
         def search_in_forest(forest, value):
+            """Encuentra en qué sub-árbol (conjunto) del bosque se encuentra un valor."""
             for index, tree in enumerate(forest):
                 if value in tree:
                     return index
-                
-        forest = []
-        edges = HeapMin()
+
+        forest = [] # Lista de conjuntos (sub-árboles)
+        edges = HeapMin() # Montículo de mínimos para todas las aristas
+        mst = [] # Minimum Spanning Tree
+
+        # Inicializar: cada vértice es un árbol en el bosque y todas las aristas se añaden al montículo
         for vertex in self:
-            forest.append(vertex.value)
+            forest.append([vertex.value])
             for edge in vertex.edges:
                 edges.arrive([vertex.value, edge.value], edge.weight)
-        
+
+        # Procesar aristas en orden de menor a mayor peso
         while len(forest) > 1 and edges.size() > 0:
             edge = edges.attention()
-            origin = search_in_forest(forest, edge[1][0])
-            destination = search_in_forest(forest, edge[1][1])
+            origin_vertex, dest_vertex = edge[1]
+            weight = edge[0]
+
+            # Encontrar los árboles a los que pertenecen el origen y el destino de la arista
+            origin = search_in_forest(forest, origin_vertex)
+            destination = search_in_forest(forest, dest_vertex)
+
             if origin is not None and destination is not None:
+                # Si no están en el mismo árbol (no forman un ciclo), unir los árboles y añadir la arista al MST
                 if origin != destination:
-                    if origin > destination:
-                        vertex_origin = forest.pop(origin)
-                        vertex_destination = forest.pop(destination)
-                    else:
-                        vertex_destination = forest.pop(destination)
-                        vertex_origin = forest.pop(origin)
-
-
-                    if '-' not in vertex_origin and '-' not in vertex_destination:
-                        forest.append(f'{vertex_origin}-{vertex_destination}-{edge[0]}')
-                    elif '-' not in vertex_destination:
-                        forest.append(vertex_origin+';'+f'{edge[1][0]}-{vertex_destination}-{edge[0]}')
-                    elif '-' not in vertex_origin:
-                        forest.append(vertex_destination+';'+f'{vertex_origin}-{edge[1][1]}-{edge[0]}')
-                    else:
-                        forest.append(vertex_origin+';'+vertex_destination+';'+f'{edge[1][0]}-{edge[1][1]}-{edge[0]}')
-        
-        from_vertex = search_in_forest(forest, origin_vertex)
-        
-        return forest[from_vertex] if from_vertex is not None else forest
+                    forest[destination].extend(forest.pop(origin))
+                    mst.append((origin_vertex, dest_vertex, weight))
+        return mst
 
 
 g = Graph(is_directed=True)
